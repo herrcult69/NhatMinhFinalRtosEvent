@@ -1,10 +1,8 @@
-# Smart Climate Controller Using RTOS
+# Smart Controller System using RTOS
 
-An RTOS-style smart climate controller developed for the YoloUNO / ESP32-S3 platform.
+An event-driven, RTOS-based climate control simulation built for the YoloUNO (ESP32-S3) microcontroller. 
 
-This project can run on Yolo.
-
-The project reads temperature and humidity from a DHT20 sensor, displays the newest values on an LCD1602, and uses RGB LEDs to simulate a heater, cooler, and humidifier. Independent asynchronous tasks handle periodic sensing, status blinking, display updates, and climate-control behavior.
+This project uses asynchronous tasks (`asyncio`) to read temperature and humidity from a DHT20 sensor, display values on an LCD1602, and simulate a heater, cooler, and humidifier using RGB LEDs.
 
 ## Run Online
 
@@ -14,31 +12,38 @@ This project runs on OhStem’s online simulation platform:
 
 ## Features
 
-- Reads temperature and humidity from the DHT20 every 5 seconds
-- Prints sensor readings to the Serial Monitor
-- Updates an LCD1602 display with the latest values
-- Blinks onboard LED D13 every 1 second as a system-status indicator
-- Heater RGB LED on D3:
-  - Green: temperature >= 18 C
-  - Orange: 10 C < temperature < 18 C
-  - Red: temperature <= 10 C
-- Cooler RGB LED on D5:
-  - Activates green for 5 seconds when temperature >= 28 C
-- Humidifier RGB LED on D7:
-  - Activates when humidity < 40%
-  - Green for 5 seconds, yellow for 3 seconds, then red for 2 seconds
+- **Real-Time Sensing:** Reads temperature and humidity from the DHT20 every 5 seconds and prints to the Serial Monitor.
+- **Display:** Updates an LCD1602 display with the latest sensor values and configured threshold settings.
+- **System Indicator:** Blinks the onboard LED D13 every 1 second to confirm the event loop is running.
+- **Heater Simulation (RGB LED D3):**
+  - **Green:** Temperature >= 18°C (Safe)
+  - **Orange:** 10°C < Temperature < 18°C (Warning)
+  - **Red:** Temperature <= 10°C (Critical)
+- **Cooler Simulation (RGB LED D5):**
+  - Activates **Green** for 5 seconds when temperature >= 28°C.
+- **Humidifier Simulation (RGB LED D7):**
+  - Activates when humidity < 40%.
+  - Sequence: **Green** (5s) -> **Yellow** (3s) -> **Red** (2s).
+
+## Advanced Features
+
+- **Data Logging:** Periodically saves all sensor readings to `sensor_log.csv` stored in the YoloUNO flash memory.
+- **System Statistics:** Pressing the **BOOT** button calculates and prints the min, max, and average temperature and humidity values to the Serial Monitor.
+- **Adjustable Thresholds:** 
+  - **Button A/B (Short Press):** Increase/decrease the cooler temperature threshold.
+  - **Button A/B (Long Press):** Increase/decrease the humidifier humidity threshold.
 
 ## Task Communication
 
-The sensor task stores the latest temperature and humidity in a shared data object. It then signals separate Event-based binary notifications for the LCD, heater, cooler, and humidifier tasks.
+The sensor task acts as the data producer. It reads the sensor data, stores it in a shared `latest_update` object, and uses four binary `asyncio.Event` flags to signal the consumer tasks (LCD, heater, cooler, humidifier).
 
-This latest-value approach is used instead of a queue because the control tasks should respond to the most recent environmental state rather than process old sensor readings.
+This latest-value approach is chosen over a queue to ensure control tasks respond only to the most current environmental state, preventing delayed reactions from outdated measurements.
 
 ## Main Tasks
 
-- `task_LED_Blinky()` — toggles LED D13 every second
-- `read_sensor_task()` — reads DHT20 data every 5 seconds
-- `lcd_task()` — updates LCD1602 after a sensor update
-- `heater_task()` — selects the heater LED color
-- `cooler_task()` — controls the 5-second cooling indication
-- `humidifier_task()` — controls the timed humidifier LED sequence
+- `task_LED_Blinky()` — Toggles onboard LED every second
+- `read_sensor_task()` — Reads DHT20 data every 5 seconds, logs it, and triggers events
+- `lcd_task()` — Updates the LCD1602 after an event trigger
+- `heater_task()` — Selects the heater LED color based on current temperature
+- `cooler_task()` — Runs the 5-second cooling indicator if needed
+- `humidifier_task()` — Runs the timed humidifier sequence if needed
